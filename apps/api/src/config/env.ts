@@ -21,6 +21,8 @@ if (isProduction && jwtSecret === 'pulse-dev-secret-do-not-use-in-production') {
   throw new Error('JWT_SECRET must be explicitly set in production');
 }
 
+const smtpPort = Number(process.env.SMTP_PORT ?? 587);
+
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? 'development',
   isProduction,
@@ -33,4 +35,19 @@ export const env = {
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean),
+  smtp: {
+    host: process.env.SMTP_HOST ?? '',
+    port: smtpPort,
+    user: process.env.SMTP_USER ?? '',
+    password: process.env.SMTP_PASSWORD ?? '',
+    from: process.env.SMTP_FROM ?? '',
+    secure: process.env.SMTP_SECURE === 'true' || smtpPort === 465,
+  },
+  notification: {
+    /** BullMQ attempts per delivery (finite by design — no infinite loops). */
+    maxAttempts: Number(process.env.NOTIFICATION_MAX_ATTEMPTS ?? 5),
+    /** Exponential backoff base delay, in milliseconds. */
+    backoffMs: Number(process.env.NOTIFICATION_BACKOFF_MS ?? 1000),
+    webhookTimeoutMs: Number(process.env.NOTIFICATION_WEBHOOK_TIMEOUT_MS ?? 10_000),
+  },
 } as const;

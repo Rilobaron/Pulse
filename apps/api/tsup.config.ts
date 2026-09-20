@@ -4,6 +4,7 @@ export default defineConfig({
   entry: {
     server: 'src/server.ts',
     worker: 'src/worker.ts',
+    notificationWorker: 'src/notificationWorker.ts',
   },
   format: ['cjs'],
   target: 'node20',

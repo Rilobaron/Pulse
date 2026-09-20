@@ -3,7 +3,7 @@ import { env } from './env.js';
 
 /**
  * BullMQ requires `maxRetriesPerRequest: null` on blocking commands.
- * This connection is shared by the queue producers; the worker creates its own.
+ * This connection is shared by the queue producers; workers create their own.
  */
 export const redisConnection = new Redis(env.redisUrl, {
   maxRetriesPerRequest: null,
@@ -13,3 +13,22 @@ export const redisConnection = new Redis(env.redisUrl, {
 redisConnection.on('error', (err) => {
   console.error('[redis] Connection error:', err.message);
 });
+
+/** Creates a dedicated connection (one per queue producer / worker). */
+export function createRedisConnection(): Redis {
+  return new Redis(env.redisUrl, {
+    maxRetriesPerRequest: null,
+    enableReadyCheck: true,
+  });
+}
+
+/** Lightweight liveness probe used by the health endpoint. */
+export async function pingRedis(): Promise<boolean> {
+  try {
+    const result = await redisConnection.ping();
+    return result === 'PONG';
+  } catch {
+    return false;
+  }
+}
+

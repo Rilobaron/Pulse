@@ -6,11 +6,16 @@ import type {
   LoginInput,
   MonitorCheckDTO,
   MonitorDTO,
+  NotificationChannelDTO,
+  NotificationChannelInput,
+  NotificationChannelSecretResponse,
+  NotificationDeliveryDTO,
   PublicStatusPage,
   RegisterInput,
   StatusPageDTO,
   StatusPageInput,
   UpdateMonitorInput,
+  UpdateNotificationChannelInput,
   UserDTO,
 } from '@pulse/shared';
 
@@ -105,6 +110,30 @@ export const api = {
   },
   publicStatus: {
     get: (slug: string) => request<PublicStatusPage>(`/public/status-pages/${slug}`),
+  },
+  notificationChannels: {
+    list: () => request<NotificationChannelDTO[]>('/notification-channels'),
+    create: (input: NotificationChannelInput) =>
+      request<NotificationChannelSecretResponse>('/notification-channels', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+    update: (id: string, input: UpdateNotificationChannelInput) =>
+      request<NotificationChannelSecretResponse>(`/notification-channels/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      }),
+    remove: (id: string) => request<void>(`/notification-channels/${id}`, { method: 'DELETE' }),
+    test: (id: string) => request<NotificationDeliveryDTO>(`/notification-channels/${id}/test`, { method: 'POST' }),
+  },
+  notifications: {
+    deliveries: (filters: { monitorId?: string; status?: string } = {}) => {
+      const query = new URLSearchParams();
+      if (filters.monitorId) query.set('monitorId', filters.monitorId);
+      if (filters.status) query.set('status', filters.status);
+      const qs = query.toString();
+      return request<NotificationDeliveryDTO[]>(`/notification-deliveries${qs ? `?${qs}` : ''}`);
+    },
   },
   stats: {
     dashboard: () => request<DashboardStats>('/stats/dashboard'),

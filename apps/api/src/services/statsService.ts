@@ -3,6 +3,7 @@ import type { DashboardStats } from '@pulse/shared';
 import { Monitor } from '../models/Monitor.js';
 import { MonitorCheck } from '../models/MonitorCheck.js';
 import { Incident } from '../models/Incident.js';
+import { countRecentFailures } from './notificationService.js';
 
 /**
  * Aggregated stats for the authenticated user's dashboard.
@@ -47,6 +48,7 @@ export async function getDashboardStats(userId: string): Promise<DashboardStats>
   ]);
 
   const activeIncidents = await Incident.countDocuments({ userId: ownerId, status: 'OPEN' });
+  const failedNotifications = await countRecentFailures(userId);
 
   return {
     total: statusAgg?.total ?? 0,
@@ -55,6 +57,7 @@ export async function getDashboardStats(userId: string): Promise<DashboardStats>
     unknown: statusAgg?.unknown ?? 0,
     paused: statusAgg?.paused ?? 0,
     activeIncidents,
+    failedNotifications,
     avgResponseTime: responseAgg ? Math.round(responseAgg.avg) : null,
   };
 }

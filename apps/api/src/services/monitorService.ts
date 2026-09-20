@@ -4,12 +4,14 @@ import type {
   MonitorDTO,
   UpdateMonitorInput,
 } from '@pulse/shared';
+import { DEFAULT_FAILURE_THRESHOLD, DEFAULT_RECOVERY_THRESHOLD } from '@pulse/shared';
 import { Monitor, type IMonitor } from '../models/Monitor.js';
 import { MonitorCheck } from '../models/MonitorCheck.js';
 import { Incident } from '../models/Incident.js';
 import { NotFoundError } from '../utils/errors.js';
 import { assertSafeMonitorUrl } from '../utils/urlSafety.js';
 import { removeMonitorSchedule, scheduleMonitor } from '../jobs/monitorQueue.js';
+import { assertOwnedChannelIds } from './notificationService.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -49,6 +51,12 @@ async function toMonitorDTO(monitor: IMonitor): Promise<MonitorDTO> {
     timeout: monitor.timeout,
     status: monitor.status,
     isPaused: monitor.isPaused,
+    // Fallbacks keep documents created before Phase 3 fully valid.
+    consecutiveFailures: monitor.consecutiveFailures ?? 0,
+    consecutiveSuccesses: monitor.consecutiveSuccesses ?? 0,
+    failureThreshold: monitor.failureThreshold ?? DEFAULT_FAILURE_THRESHOLD,
+    recoveryThreshold: monitor.recoveryThreshold ?? DEFAULT_RECOVERY_THRESHOLD,
+    notificationChannelIds: (monitor.notificationChannelIds ?? []).map((channelId) => channelId.toString()),
     lastCheckedAt: monitor.lastCheckedAt?.toISOString() ?? null,
     lastResponseTime: monitor.lastResponseTime,
     uptime24h,
@@ -81,6 +89,8 @@ export async function createMonitor(
   input: CreateMonitorInput,
 ): Promise<MonitorDTO> {
   await assertSafeMonitorUrl(input.url);
+  const channelIds = input.notificationChannelIds ?? [];
+  await assertOwnedChannelIds(userId, channelIds);
 
   const monitor = await Monitor.create({
     userId,
@@ -89,6 +99,9 @@ export async function createMonitor(
     method: input.method,
     interval: input.interval,
     timeout: input.timeout,
+    failureThreshold: input.failureThreshold,
+    recoveryThreshold: input.recoveryThreshold,
+    notificationChannelIds: channelIds,
   });
 
   await scheduleMonitor(monitor._id.toString(), monitor.interval);
@@ -114,12 +127,23 @@ export async function updateMonitor(
   if (input.method !== undefined) monitor.method = input.method;
   if (input.interval !== undefined) monitor.interval = input.interval;
   if (input.timeout !== undefined) monitor.timeout = input.timeout;
+  if (input.failureThreshold !== undefined) monitor.failureThreshold = input.failureThreshold;
+  if (input.recoveryThreshold !== undefined) monitor.recoveryThreshold = input.recoveryThreshold;
+
+  if (input.notificationChannelIds !== undefined) {
+    await assertOwnedChannelIds(userId, input.notificationChannelIds);
+    monitor.notificationChannelIds = input.notificationChannelIds.map(
+      (channelId) => new Types.ObjectId(channelId),
+    );
+  }
 
   // A new URL is a different target: previous results must not determine the
-  // new endpoint's state. Reset the operational snapshot and resolve any open
-  // incident tied to the old target.
+  // new endpoint's state. Reset the operational snapshot (and counters) and
+  // resolve any open incident tied to the old target.
   if (urlChanged) {
     monitor.status = 'UNKNOWN';
+    monitor.consecutiveFailures = 0;
+    monitor.consecutiveSuccesses = 0;
     monitor.lastCheckedAt = null;
     monitor.lastResponseTime = null;
     await Incident.updateMany(

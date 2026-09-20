@@ -3,12 +3,15 @@ import type { IncidentDTO } from '@pulse/shared';
 import { Incident, type IIncident } from '../models/Incident.js';
 import { Monitor } from '../models/Monitor.js';
 import { NotFoundError } from '../utils/errors.js';
+import { enqueueIncidentNotifications } from './notificationService.js';
+import { logger, sanitizeError } from '../utils/logger.js';
 
 const INCIDENT_HISTORY_LIMIT = 100;
 
 interface TransitionInput {
   monitorId: string;
   userId: string;
+  monitorName: string;
   previousStatus: 'UP' | 'DOWN' | 'UNKNOWN';
   newStatus: 'UP' | 'DOWN' | 'UNKNOWN';
   httpStatus: number | null;
@@ -49,13 +52,38 @@ function isDuplicateKeyError(err: unknown): boolean {
 }
 
 /**
- * Handles incident lifecycle on a monitor status transition.
+ * Notification fan-out must never break the monitoring pipeline: if the queue
+ * or the database hiccups, we log and move on — the check result is already saved.
+ */
+async function safeEnqueueIncidentNotifications(params: {
+  incidentId: string;
+  monitorId: string;
+  eventType: 'INCIDENT_OPENED' | 'INCIDENT_RESOLVED';
+}): Promise<void> {
+  try {
+    await enqueueIncidentNotifications(params);
+  } catch (err) {
+    logger.error('notification_enqueue_failed', {
+      incidentId: params.incidentId,
+      monitorId: params.monitorId,
+      eventType: params.eventType,
+      error: sanitizeError(err),
+    });
+  }
+}
+
+/**
+ * Handles incident lifecycle on a monitor *operational* status transition.
  *
  * Rules (documented and intentional):
  *  - UP|UNKNOWN -> DOWN : open an incident, but only if none is OPEN for this monitor.
  *  - DOWN -> UP         : resolve the currently OPEN incident (if any).
  *  - DOWN -> DOWN       : update lastHttpStatus on the existing OPEN incident.
  *  - any  -> UNKNOWN    : no-op (never opens, never resolves).
+ *
+ * Notifications are enqueued only for real transitions (opened / resolved) and
+ * never for intermediate failures — those are handled by the anti-flapping layer
+ * before reaching this function.
  *
  * Concurrency safety:
  *  Opening uses `findOneAndUpdate` with `$setOnInsert` + `upsert`, guarded by the
@@ -74,19 +102,39 @@ export async function handleStatusTransition(input: TransitionInput): Promise<vo
 
   // ── Resolve on recovery ────────────────────────────────────────────────
   if (newStatus === 'UP' && previousStatus === 'DOWN') {
-    await Incident.findOneAndUpdate(
+    const resolved = await Incident.findOneAndUpdate(
       { monitorId: monitorObjectId, status: 'OPEN' },
       { $set: { status: 'RESOLVED', resolvedAt: now, lastHttpStatus: httpStatus } },
       { new: true },
     );
+
+    if (resolved) {
+      logger.info('incident_resolved', {
+        incidentId: resolved._id.toString(),
+        monitorId,
+        monitorName: input.monitorName,
+        durationMs: now.getTime() - resolved.startedAt.getTime(),
+      });
+
+      await safeEnqueueIncidentNotifications({
+        incidentId: resolved._id.toString(),
+        monitorId,
+        eventType: 'INCIDENT_RESOLVED',
+      });
+    }
     return;
   }
 
-  // ── Open on failure (first DOWN opens; consecutive DOWNs do not duplicate) ──
+  // ── Open on failure ────────────────────────────────────────────────────
   if (newStatus === 'DOWN') {
     const cause = humanizeCause(error, httpStatus);
+    // Only a real transition opens an incident (and therefore notifies);
+    // consecutive DOWN checks just refresh the open incident.
+    const isNewOutage = previousStatus !== 'DOWN';
+
+    let incident: IIncident | null;
     try {
-      await Incident.findOneAndUpdate(
+      incident = await Incident.findOneAndUpdate(
         { monitorId: monitorObjectId, status: 'OPEN' },
         {
           $setOnInsert: {
@@ -112,6 +160,22 @@ export async function handleStatusTransition(input: TransitionInput): Promise<vo
         return;
       }
       throw err;
+    }
+
+    if (isNewOutage && incident) {
+      logger.info('incident_opened', {
+        incidentId: incident._id.toString(),
+        monitorId,
+        monitorName: input.monitorName,
+        cause,
+        httpStatus,
+      });
+
+      await safeEnqueueIncidentNotifications({
+        incidentId: incident._id.toString(),
+        monitorId,
+        eventType: 'INCIDENT_OPENED',
+      });
     }
     return;
   }

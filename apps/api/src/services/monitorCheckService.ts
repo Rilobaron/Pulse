@@ -4,6 +4,8 @@ import { MonitorCheck, type IMonitorCheck } from '../models/MonitorCheck.js';
 import { NotFoundError } from '../utils/errors.js';
 import { assertSafeMonitorUrl } from '../utils/urlSafety.js';
 import { handleStatusTransition } from './incidentService.js';
+import { evaluateHealth } from './healthEvaluator.js';
+import { logger } from '../utils/logger.js';
 
 const CHECK_HISTORY_LIMIT = 100;
 
@@ -87,9 +89,16 @@ async function executeHttpCheck(monitor: IMonitor): Promise<RawCheckResult> {
 }
 
 /**
- * Runs a check for the given monitor, persists the result, updates the
- * monitor's status snapshot and drives the incident lifecycle on transitions.
- * Single entry point used by both the BullMQ worker and the manual check endpoint.
+ * Runs a check for the given monitor.
+ *
+ * Pipeline: persist raw check → evaluate health (anti-flapping) → update the
+ * operational snapshot → drive the incident lifecycle.
+ *
+ * IMPORTANT — check status vs operational status:
+ *  - `MonitorCheck.status` is the RAW result of that single probe and is always
+ *    persisted, even while the monitor is still considered UP.
+ *  - `Monitor.status` is the EVALUATED operational state, which only changes once
+ *    the configured thresholds are reached (see `evaluateHealth`).
  *
  * @param opts.skipPaused - scheduled (automatic) checks skip paused monitors;
  *                          manual checks are still allowed to run.
@@ -108,9 +117,9 @@ export async function runCheckForMonitor(
     return null;
   }
 
-  const previousStatus = monitor.status;
   const result = await executeHttpCheck(monitor);
 
+  // ── 1. Always persist the real result of this probe ──────────────────
   const check = await MonitorCheck.create({
     monitorId: monitor._id,
     status: result.status,
@@ -120,37 +129,68 @@ export async function runCheckForMonitor(
     checkedAt: new Date(),
   });
 
+  // ── 2. Evaluate the operational status against the anti-flapping rules ──
+  const evaluation = evaluateHealth(
+    {
+      status: monitor.status,
+      consecutiveFailures: monitor.consecutiveFailures ?? 0,
+      consecutiveSuccesses: monitor.consecutiveSuccesses ?? 0,
+      failureThreshold: monitor.failureThreshold,
+      recoveryThreshold: monitor.recoveryThreshold,
+    },
+    result.status,
+  );
+
+  // ── 3. Persist the evaluated snapshot (never the raw result) ──────────
   await Monitor.updateOne(
     { _id: monitor._id },
     {
       $set: {
-        status: result.status,
+        status: evaluation.status,
+        consecutiveFailures: evaluation.consecutiveFailures,
+        consecutiveSuccesses: evaluation.consecutiveSuccesses,
         lastCheckedAt: check.checkedAt,
         lastResponseTime: result.responseTime,
       },
     },
   );
 
-  // Drive incident lifecycle on status transitions (never for paused monitors).
-  if (!monitor.isPaused && previousStatus !== result.status) {
-    await handleStatusTransition({
-      monitorId: monitor._id.toString(),
-      userId: monitor.userId.toString(),
-      previousStatus,
-      newStatus: result.status,
-      httpStatus: result.httpStatus,
-      error: result.error,
-    });
-  } else if (!monitor.isPaused && result.status === 'DOWN') {
-    // Consecutive DOWN: refresh lastHttpStatus on the open incident (no new incident).
-    await handleStatusTransition({
-      monitorId: monitor._id.toString(),
-      userId: monitor.userId.toString(),
-      previousStatus: 'DOWN',
-      newStatus: 'DOWN',
-      httpStatus: result.httpStatus,
-      error: result.error,
-    });
+  logger.info('check_evaluated', {
+    monitorId: monitor._id.toString(),
+    monitorName: monitor.name,
+    checkStatus: result.status,
+    operationalStatus: evaluation.status,
+    transitioned: evaluation.transitioned,
+    consecutiveFailures: evaluation.consecutiveFailures,
+    consecutiveSuccesses: evaluation.consecutiveSuccesses,
+    failureThreshold: monitor.failureThreshold,
+    responseTime: result.responseTime,
+  });
+
+  // ── 4. Incidents only on real operational transitions ────────────────
+  if (!monitor.isPaused) {
+    if (evaluation.transitioned) {
+      await handleStatusTransition({
+        monitorId: monitor._id.toString(),
+        userId: monitor.userId.toString(),
+        monitorName: monitor.name,
+        previousStatus: evaluation.previousStatus,
+        newStatus: evaluation.status,
+        httpStatus: result.httpStatus,
+        error: result.error,
+      });
+    } else if (evaluation.status === 'DOWN') {
+      // Still DOWN after the threshold: refresh lastHttpStatus, no new incident.
+      await handleStatusTransition({
+        monitorId: monitor._id.toString(),
+        userId: monitor.userId.toString(),
+        monitorName: monitor.name,
+        previousStatus: 'DOWN',
+        newStatus: 'DOWN',
+        httpStatus: result.httpStatus,
+        error: result.error,
+      });
+    }
   }
 
   return toCheckDTO(check);

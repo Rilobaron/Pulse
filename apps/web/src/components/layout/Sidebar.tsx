@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Monitor, Settings, X } from 'lucide-react';
+import { Bell, LayoutDashboard, Monitor, Settings, X } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import { cn } from '@/lib/utils';
 
@@ -7,6 +7,7 @@ const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/monitors', label: 'Monitors', icon: Monitor },
   { to: '/settings/status-page', label: 'Status Page', icon: Settings },
+  { to: '/settings/notifications', label: 'Notifications', icon: Bell },
 ];
 
 interface SidebarProps {

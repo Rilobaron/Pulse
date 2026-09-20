@@ -24,6 +24,15 @@ export const MIN_TIMEOUT_MS = 1_000;
 export const MAX_TIMEOUT_MS = 30_000;
 export const DEFAULT_TIMEOUT_MS = 10_000;
 
+/**
+ * Anti-flapping thresholds: how many consecutive results are required before the
+ * operational status changes. See `evaluateHealth` on the API for the full rules.
+ */
+export const MIN_THRESHOLD = 1;
+export const MAX_THRESHOLD = 10;
+export const DEFAULT_FAILURE_THRESHOLD = 3;
+export const DEFAULT_RECOVERY_THRESHOLD = 2;
+
 // ─────────────────────────────────────────────────────────
 // Auth schemas
 // ─────────────────────────────────────────────────────────
@@ -63,11 +72,47 @@ export const createMonitorSchema = z.object({
     .min(MIN_TIMEOUT_MS, 'Timeout must be at least 1 second')
     .max(MAX_TIMEOUT_MS, 'Timeout must be at most 30 seconds')
     .default(DEFAULT_TIMEOUT_MS),
+  failureThreshold: z
+    .number()
+    .int()
+    .min(MIN_THRESHOLD, 'Failure threshold must be at least 1')
+    .max(MAX_THRESHOLD, 'Failure threshold must be at most 10')
+    .default(DEFAULT_FAILURE_THRESHOLD),
+  recoveryThreshold: z
+    .number()
+    .int()
+    .min(MIN_THRESHOLD, 'Recovery threshold must be at least 1')
+    .max(MAX_THRESHOLD, 'Recovery threshold must be at most 10')
+    .default(DEFAULT_RECOVERY_THRESHOLD),
+  notificationChannelIds: z.array(z.string().min(1)).max(50).default([]),
 });
 export type CreateMonitorInput = z.infer<typeof createMonitorSchema>;
 
 export const updateMonitorSchema = createMonitorSchema.partial();
 export type UpdateMonitorInput = z.infer<typeof updateMonitorSchema>;
+
+// ─────────────────────────────────────────────────────────
+// Notification schemas
+// ─────────────────────────────────────────────────────────
+
+export const NOTIFICATION_CHANNEL_TYPES = ['DISCORD', 'WEBHOOK', 'EMAIL'] as const;
+export type NotificationChannelType = (typeof NOTIFICATION_CHANNEL_TYPES)[number];
+
+export const notificationChannelSchema = z.object({
+  name: z.string().trim().min(2, 'Name must be at least 2 characters').max(80),
+  type: z.enum(NOTIFICATION_CHANNEL_TYPES),
+  enabled: z.boolean().default(true),
+  // Channel-specific target: URL for DISCORD/WEBHOOK, email address for EMAIL.
+  // Format is validated per type by the service (the definitive check) and again
+  // by the frontend for a better UX.
+  target: z.string().trim().min(1, 'Target is required').max(2048),
+  /** Generic webhooks only: rotate the signing secret (new secret returned once). */
+  regenerateSecret: z.boolean().optional(),
+});
+export type NotificationChannelInput = z.infer<typeof notificationChannelSchema>;
+
+export const updateNotificationChannelSchema = notificationChannelSchema.partial();
+export type UpdateNotificationChannelInput = z.infer<typeof updateNotificationChannelSchema>;
 
 // ─────────────────────────────────────────────────────────
 // Status Page schemas
@@ -113,6 +158,13 @@ export interface MonitorDTO {
   timeout: number;
   status: MonitorStatus;
   isPaused: boolean;
+  /** Consecutive failed checks so far (anti-flapping counter). */
+  consecutiveFailures: number;
+  /** Consecutive successful checks so far (anti-flapping counter). */
+  consecutiveSuccesses: number;
+  failureThreshold: number;
+  recoveryThreshold: number;
+  notificationChannelIds: string[];
   lastCheckedAt: string | null;
   lastResponseTime: number | null;
   /** Uptime percentage over the last 24 hours (null when there are no checks yet). */
@@ -140,6 +192,8 @@ export interface DashboardStats {
   unknown: number;
   paused: number;
   activeIncidents: number;
+  /** Failed notification deliveries in the last 24 hours. */
+  failedNotifications: number;
   /** Average response time (ms) across checks from the last 24 hours. */
   avgResponseTime: number | null;
 }
@@ -215,4 +269,55 @@ export interface StatusPageDTO {
 
 export interface ApiErrorResponse {
   message: string;
+}
+
+// ─────────────────────────────────────────────────────────
+// Notification DTOs
+// ─────────────────────────────────────────────────────────
+
+export type NotificationEventType = 'INCIDENT_OPENED' | 'INCIDENT_RESOLVED' | 'MONITOR_TEST';
+export type NotificationDeliveryStatus = 'PENDING' | 'SENT' | 'FAILED';
+
+/**
+ * Channel as exposed by the API. Secrets (webhook URLs, Discord webhook URLs,
+ * HMAC secrets) are NEVER returned after creation — only a masked preview.
+ */
+export interface NotificationChannelDTO {
+  id: string;
+  name: string;
+  type: NotificationChannelType;
+  enabled: boolean;
+  /** Masked target, e.g. `https://discord.com/api/webhooks/***` or `ops@example.com`. */
+  maskedTarget: string;
+  /** True when the channel has a stored HMAC secret (generic webhooks only). */
+  hasSecret: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Returned only once, immediately after creating/rotating a generic webhook. */
+export interface NotificationChannelSecretResponse {
+  channel: NotificationChannelDTO;
+  webhookSecret: string;
+}
+
+export interface NotificationDeliveryDTO {
+  id: string;
+  channelId: string;
+  channelName: string;
+  channelType: NotificationChannelType;
+  monitorId: string;
+  monitorName: string;
+  incidentId: string | null;
+  eventType: NotificationEventType;
+  status: NotificationDeliveryStatus;
+  attempts: number;
+  lastError: string | null;
+  sentAt: string | null;
+  createdAt: string;
+}
+
+export interface EmailProviderStatus {
+  configured: boolean;
+  from: string | null;
 }

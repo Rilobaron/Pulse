@@ -10,6 +10,13 @@ vi.mock('../models/Incident.js', () => ({
   },
 }));
 vi.mock('../models/Monitor.js', () => ({ Monitor: { findOne: vi.fn() } }));
+vi.mock('../services/notificationService.js', () => ({
+  enqueueIncidentNotifications: vi.fn().mockResolvedValue(0),
+}));
+vi.mock('../utils/logger.js', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+  sanitizeError: (err: unknown) => (err instanceof Error ? err.message : String(err)),
+}));
 
 import { Incident } from '../models/Incident.js';
 import { handleStatusTransition } from '../services/incidentService.js';
@@ -19,6 +26,7 @@ const findOneAndUpdate = vi.mocked(Incident.findOneAndUpdate);
 const base = {
   monitorId: '64b2f0000000000000000001',
   userId: '64b2f0000000000000000002',
+  monitorName: 'API',
   error: 'Connection timeout',
   httpStatus: null,
 };

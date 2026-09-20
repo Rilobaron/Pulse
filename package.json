@@ -15,7 +15,7 @@
     "build": "npm run build -w @pulse/api && npm run build -w @pulse/web",
     "typecheck": "npm run typecheck -w @pulse/shared && npm run typecheck -w @pulse/api && npm run typecheck -w @pulse/web",
     "test": "npm run test -w @pulse/api",
-    "lint": "npm run typecheck",
+    "lint": "eslint apps packages",
     "start": "npm run start -w @pulse/api",
     "start:worker": "npm run start:worker -w @pulse/api",
     "infra:up": "docker compose up -d mongo redis",
@@ -24,8 +24,14 @@
     "docker:down": "docker compose down -v"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "concurrently": "^9.1.2",
-    "typescript": "^5.7.3"
+    "eslint": "^10.11.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.7",
+    "globals": "^17.12.0",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.70.0"
   },
   "engines": {
     "node": ">=20"

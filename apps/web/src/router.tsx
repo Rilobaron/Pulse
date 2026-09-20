@@ -11,6 +11,7 @@ import NewMonitorPage from '@/pages/NewMonitorPage';
 import MonitorDetailPage from '@/pages/MonitorDetailPage';
 import StatusPageSettingsPage from '@/pages/StatusPageSettingsPage';
 import StatusPagePublic from '@/pages/StatusPagePublic';
+import NotificationsSettingsPage from '@/pages/NotificationsSettingsPage';
 
 function FullScreenSpinner() {
   return (
@@ -36,6 +37,7 @@ function PublicOnlyRoute() {
 
 export const router = createBrowserRouter([
   // Public status pages — no authentication required
+  { path: '/status-page', element: <Navigate to="/status/pulse-demo" replace /> },
   { path: '/status/:slug', element: <StatusPagePublic /> },
   {
     element: <PublicOnlyRoute />,
@@ -60,6 +62,7 @@ export const router = createBrowserRouter([
           { path: '/monitors/new', element: <NewMonitorPage /> },
           { path: '/monitors/:id', element: <MonitorDetailPage /> },
           { path: '/settings/status-page', element: <StatusPageSettingsPage /> },
+          { path: '/settings/notifications', element: <NotificationsSettingsPage /> },
         ],
       },
     ],
