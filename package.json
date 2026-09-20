@@ -1,0 +1,33 @@
+{
+  "name": "pulse",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pulse - Website & API uptime monitoring platform",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,worker,web -c blue,yellow,green \"npm run dev -w @pulse/api\" \"npm run worker -w @pulse/api\" \"npm run dev -w @pulse/web\"",
+    "dev:api": "npm run dev -w @pulse/api",
+    "dev:worker": "npm run worker -w @pulse/api",
+    "dev:web": "npm run dev -w @pulse/web",
+    "build": "npm run build -w @pulse/api && npm run build -w @pulse/web",
+    "typecheck": "npm run typecheck -w @pulse/shared && npm run typecheck -w @pulse/api && npm run typecheck -w @pulse/web",
+    "test": "npm run test -w @pulse/api",
+    "lint": "npm run typecheck",
+    "start": "npm run start -w @pulse/api",
+    "start:worker": "npm run start:worker -w @pulse/api",
+    "infra:up": "docker compose up -d mongo redis",
+    "infra:down": "docker compose down",
+    "docker:up": "docker compose up -d --build",
+    "docker:down": "docker compose down -v"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
