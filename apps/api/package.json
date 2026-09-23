@@ -12,6 +12,7 @@
     "start": "node dist/server.cjs",
     "start:worker": "node dist/worker.cjs",
     "start:notification-worker": "node dist/notificationWorker.cjs",
+    "start:workers": "node dist/workersRunner.cjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
     "test": "vitest run"
