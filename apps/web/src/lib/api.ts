@@ -41,6 +41,11 @@ export function setToken(token: string | null): void {
   }
 }
 
+// Origin of the API. Set VITE_API_URL at build time (e.g. on Vercel) to call a separate
+// backend; when unset, requests stay relative ("/api/...") and go through the Vite dev
+// proxy or the nginx proxy. Trailing slashes are stripped so we never emit "//api".
+const API_BASE_URL = (import.meta.env.VITE_API_URL ?? '').trim().replace(/\/+$/, '');
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
 
@@ -49,7 +54,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 
-  const response = await fetch(`/api${path}`, {
+  const response = await fetch(`${API_BASE_URL}/api${path}`, {
     ...options,
     headers: { ...headers, ...(options.headers as Record<string, string> | undefined) },
   });
