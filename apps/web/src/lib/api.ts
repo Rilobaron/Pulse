@@ -54,10 +54,18 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 
-  const response = await fetch(`${API_BASE_URL}/api${path}`, {
-    ...options,
-    headers: { ...headers, ...(options.headers as Record<string, string> | undefined) },
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}/api${path}`, {
+      ...options,
+      headers: { ...headers, ...(options.headers as Record<string, string> | undefined) },
+    });
+  } catch {
+    // fetch only rejects when no HTTP response was received (server down, DNS, or a
+    // CORS block, which the browser reports the same way). Surface that distinctly
+    // instead of letting callers fall back to a generic message.
+    throw new ApiError(0, 'Unable to reach the server. Please check your connection and try again.');
+  }
 
   // Auto-logout on expired/invalid token for protected requests
   if (response.status === 401 && token) {

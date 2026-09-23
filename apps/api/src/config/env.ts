@@ -33,7 +33,9 @@ export const env = {
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '7d',
   corsOrigins: (process.env.CORS_ORIGIN ?? 'http://localhost:5173')
     .split(',')
-    .map((origin) => origin.trim())
+    // Browsers send Origin without a trailing slash, so "https://app.example.com/"
+    // pasted into the env var would silently never match.
+    .map((origin) => origin.trim().replace(/\/+$/, ''))
     .filter(Boolean),
   smtp: {
     host: process.env.SMTP_HOST ?? '',
