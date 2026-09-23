@@ -3,9 +3,10 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
 import { ApiError, api } from '@/lib/api';
-import { useToast } from '@/components/ui/Toast';
+import { useToast } from '@/components/ui/toast-context';
 import { Card, CardContent } from '@/components/ui/Card';
-import { MonitorForm, type MonitorFormValues } from '@/components/MonitorForm';
+import { MonitorForm } from '@/components/MonitorForm';
+import { type MonitorFormValues } from '@/lib/monitorForm';
 
 export default function NewMonitorPage() {
   const navigate = useNavigate();

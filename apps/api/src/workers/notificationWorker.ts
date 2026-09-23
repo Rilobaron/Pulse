@@ -38,7 +38,12 @@ export function createNotificationWorker(): Worker<NotificationJobData> {
     logger.info('notification_sent', { deliveryId: job.data.deliveryId });
   });
 
-  worker.on('failed', async (job, err) => {
+  // Named async handler + explicit `void`: EventEmitter listeners must stay
+  // synchronous (no-misused-promises) while the body still awaits markDeliveryFailed.
+  const onFailed = async (
+    job: Job<NotificationJobData> | undefined,
+    err: Error,
+  ): Promise<void> => {
     if (!job) {
       logger.error('notification_job_failed', { error: sanitizeError(err) });
       return;
@@ -64,6 +69,10 @@ export function createNotificationWorker(): Worker<NotificationJobData> {
         error: sanitizeError(err),
       });
     }
+  };
+
+  worker.on('failed', (job, err) => {
+    void onFailed(job, err);
   });
 
   return worker;

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ExternalLink, Monitor as MonitorIcon } from 'lucide-react';
 import { ApiError, api } from '@/lib/api';
-import { useToast } from '@/components/ui/Toast';
+import { useToast } from '@/components/ui/toast-context';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { FieldError, Input } from '@/components/ui/Input';
@@ -65,6 +65,17 @@ export default function StatusPageSettingsPage() {
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
+          {/* First-run onboarding — only while no status page exists yet */}
+          {pageQuery.isSuccess && pageQuery.data === null && (
+            <div className="rounded-xl border border-primary/20 bg-primary-muted/40 px-5 py-4">
+              <p className="text-sm font-medium text-foreground">
+                Create your public status page.
+              </p>
+              <p className="mt-0.5 text-sm text-muted">
+                Publish a page that shows the live health of your services.
+              </p>
+            </div>
+          )}
           <Card>
             <CardHeader>
               <CardTitle className="text-base font-medium text-foreground">General</CardTitle>

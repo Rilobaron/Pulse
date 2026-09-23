@@ -7,7 +7,12 @@ vi.mock('../models/NotificationDelivery.js', () => ({
 vi.mock('../models/NotificationChannel.js', () => ({ NotificationChannel: { findById: vi.fn() } }));
 vi.mock('../models/Monitor.js', () => ({ Monitor: { findById: vi.fn() } }));
 vi.mock('../models/Incident.js', () => ({ Incident: { findById: vi.fn() } }));
-vi.mock('../providers/index.js', () => ({ sendToChannel: vi.fn() }));
+// Keep the real NotificationProviderError re-export (the service does
+// `instanceof` against it) and only stub the network entry point.
+vi.mock('../providers/index.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../providers/index.js')>()),
+  sendToChannel: vi.fn(),
+}));
 vi.mock('../utils/logger.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
   sanitizeError: (err: unknown) => (err instanceof Error ? err.message : String(err)),

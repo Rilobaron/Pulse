@@ -1,26 +1,13 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from 'react';
+import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import { CheckCircle2, XCircle, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ToastContext, type ToastType } from './toast-context';
 
 interface Toast {
   id: number;
   message: string;
-  type: 'success' | 'error';
+  type: ToastType;
 }
-
-interface ToastContextValue {
-  toast: (message: string, type?: Toast['type']) => void;
-}
-
-const ToastContext = createContext<ToastContextValue | null>(null);
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -31,7 +18,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const toast = useCallback(
-    (message: string, type: Toast['type'] = 'success') => {
+    (message: string, type: ToastType = 'success') => {
       const id = ++idRef.current;
       setToasts((prev) => [...prev, { id, message, type }]);
       setTimeout(() => dismiss(id), 4000);
@@ -44,7 +31,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="pointer-events-none fixed bottom-4 right-4 z-[100] flex w-80 flex-col gap-2">
+      <div className="pointer-events-none fixed bottom-4 right-4 z-[100] flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2">
         {toasts.map((t) => (
           <div
             key={t.id}
@@ -61,7 +48,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             ) : (
               <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-danger" />
             )}
-            <p className="flex-1 text-sm">{t.message}</p>
+            <p className="flex-1 break-words text-sm">{t.message}</p>
             <button
               onClick={() => dismiss(t.id)}
               className="text-muted-dark transition-colors hover:text-foreground"
@@ -74,10 +61,4 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       </div>
     </ToastContext.Provider>
   );
-}
-
-export function useToast(): ToastContextValue {
-  const context = useContext(ToastContext);
-  if (!context) throw new Error('useToast must be used within a ToastProvider');
-  return context;
 }

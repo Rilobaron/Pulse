@@ -2,24 +2,27 @@ import { createApp } from './app.js';
 import { connectDatabase, disconnectDatabase } from './config/database.js';
 import { env } from './config/env.js';
 import { closeMonitorQueue } from './jobs/monitorQueue.js';
+import { closeNotificationQueue } from './jobs/notificationQueue.js';
 import { redisConnection } from './config/redis.js';
+import { logger, sanitizeError } from './utils/logger.js';
 
 async function main(): Promise<void> {
   await connectDatabase();
 
   const app = createApp();
   const server = app.listen(env.port, () => {
-    console.log(`[api] Pulse API listening on http://localhost:${env.port}`);
+    logger.info('api_listening', { port: env.port });
   });
 
-  const shutdown = async (signal: string) => {
-    console.log(`[api] ${signal} received, shutting down...`);
-    server.close(async () => {
-      await closeMonitorQueue();
-      redisConnection.disconnect();
-      await disconnectDatabase();
-      process.exit(0);
+  const shutdown = async (signal: string): Promise<void> => {
+    logger.info('api_stopping', { signal });
+    await new Promise<void>((resolve) => {
+      server.close(() => resolve());
     });
+    await Promise.all([closeMonitorQueue(), closeNotificationQueue()]);
+    redisConnection.disconnect();
+    await disconnectDatabase();
+    process.exit(0);
   };
 
   process.on('SIGINT', () => void shutdown('SIGINT'));
@@ -27,6 +30,8 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  console.error('[api] Fatal error during startup:', err);
+  // sanitizeError strips any URLs (e.g. a MONGODB_URI embedded in a
+  // connection error) before the message reaches the logs.
+  logger.error('api_startup_failed', { message: sanitizeError(err) });
   process.exit(1);
 });

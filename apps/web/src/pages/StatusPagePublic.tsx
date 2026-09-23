@@ -67,17 +67,28 @@ export default function StatusPagePublic() {
   const global = globalConfig[page.globalStatus];
   const GlobalIcon = global.icon;
   const openIncidents = page.incidents.filter((i) => i.status === 'OPEN');
+  // "Past incidents" must not repeat the ones already shown as ongoing.
+  const pastIncidents = page.incidents.filter((i) => i.status === 'RESOLVED');
+  const globalBannerTone = {
+    ALL_OPERATIONAL: 'border-primary/20 bg-primary-muted/30',
+    PARTIAL_OUTAGE: 'border-warning/20 bg-warning-muted/30',
+    MAJOR_OUTAGE: 'border-danger/20 bg-danger-muted/30',
+  }[page.globalStatus];
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto w-full max-w-3xl px-4 py-12 sm:px-6 lg:py-16">
         <div className="mb-10">
           <Logo />
-          <h1 className="mt-6 text-3xl font-semibold tracking-tight text-foreground">{page.name}</h1>
+          <h1 className="mt-6 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+            {page.name}
+          </h1>
           {page.description && <p className="mt-2 text-sm text-muted">{page.description}</p>}
         </div>
 
         {/* Global status banner */}
-        <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-5 py-4">
+        <div
+          className={`flex items-center gap-3 rounded-xl border px-5 py-4 ${globalBannerTone}`}
+        >
           <GlobalIcon className={`h-5 w-5 ${global.className}`} />
           <p className="text-sm font-medium text-foreground">{global.label}</p>
         </div>
@@ -165,20 +176,21 @@ export default function StatusPagePublic() {
             ))
           )}
         </div>
-        {/* Past incidents */}
-        <div className="mt-10">
-          <h2 className="text-sm font-medium uppercase tracking-wider text-muted-dark">
-            Past Incidents
-          </h2>
-          {page.incidents.length === 0 ? (
-            <Card className="mt-4">
-              <CardContent className="py-8 text-center">
-                <p className="text-sm text-muted">No incidents reported.</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="mt-4 space-y-3">
-              {page.incidents.map((incident) => (
+        {/* Past incidents — shown only when there is something to report */}
+        {(pastIncidents.length > 0 || page.incidents.length === 0) && (
+          <div className="mt-10">
+            <h2 className="text-sm font-medium uppercase tracking-wider text-muted-dark">
+              Past Incidents
+            </h2>
+            {pastIncidents.length === 0 ? (
+              <Card className="mt-4">
+                <CardContent className="py-8 text-center">
+                  <p className="text-sm text-muted">No incidents reported.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="mt-4 space-y-3">
+                {pastIncidents.map((incident) => (
                 <Card key={incident.id}>
                   <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
                     <div>
@@ -200,9 +212,10 @@ export default function StatusPagePublic() {
                   </CardContent>
                 </Card>
               ))}
-            </div>
-          )}
-        </div>
+              </div>
+            )}
+          </div>
+        )}
 
         <p className="mt-12 text-center text-xs text-muted-dark">
           Powered by <span className="font-medium text-muted">Pulse</span>

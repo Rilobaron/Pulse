@@ -26,12 +26,17 @@ export const notificationQueue = new Queue<NotificationJobData>(NOTIFICATION_QUE
  * Enqueues one delivery. The job id is derived from the delivery's dedupe key,
  * so a re-enqueue of the same (incident, event, channel) triple cannot create a
  * second pending job while the first one still exists.
+ *
+ * BullMQ uses ':' as its Redis key delimiter and REJECTS custom job ids that
+ * contain one ("Custom Id cannot contain :"), so the dedupe key's colons are
+ * flattened to '-'. The result stays unique per triple, preserving the
+ * dedupe-on-re-enqueue behavior.
  */
 export async function enqueueDelivery(deliveryId: string, dedupeKey: string): Promise<void> {
   await notificationQueue.add(
     'deliver',
     { deliveryId },
-    { jobId: `delivery:${dedupeKey}` },
+    { jobId: `delivery-${dedupeKey.replace(/:/g, '-')}` },
   );
 }
 

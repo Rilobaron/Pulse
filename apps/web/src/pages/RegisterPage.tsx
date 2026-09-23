@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { registerSchema, type RegisterInput } from '@pulse/shared';
-import { useAuth } from '@/lib/auth';
+import { useAuth } from '@/lib/auth-context';
 import { ApiError } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { FieldError, Input } from '@/components/ui/Input';
@@ -35,7 +35,11 @@ export default function RegisterPage() {
       <h1 className="text-xl font-semibold text-foreground">Create your account</h1>
       <p className="mt-1.5 text-sm text-muted">Start monitoring your services in minutes</p>
 
-      <form className="mt-8 space-y-5" onSubmit={handleSubmit(onSubmit)} noValidate>
+      <form
+        className="mt-8 space-y-5"
+        onSubmit={(event) => void handleSubmit(onSubmit)(event)}
+        noValidate
+      >
         {serverError && (
           <div className="rounded-lg border border-danger/20 bg-danger-muted px-4 py-3 text-sm text-danger">
             {serverError}

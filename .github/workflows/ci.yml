@@ -6,35 +6,23 @@ on:
   pull_request:
 
 jobs:
-  build:
+  ci:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
           cache: npm
-
-      - name: Install dependencies
+      - name: Install
         run: npm ci
-
+      - name: Lint
+        run: npm run lint
       - name: Typecheck
         run: npm run typecheck
-
       - name: Unit tests
         run: npm test
-
       - name: Build
         run: npm run build
-
-  docker:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Validate docker-compose configuration
-        run: docker compose config --quiet
+      # Note: no deploy step on purpose. Releases to production are manual.

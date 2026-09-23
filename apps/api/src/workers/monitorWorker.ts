@@ -4,6 +4,7 @@ import { env } from '../config/env.js';
 import { runCheckForMonitor } from '../services/monitorCheckService.js';
 import type { MonitorCheckJobData } from '../jobs/monitorQueue.js';
 import { MONITOR_QUEUE_NAME } from '../jobs/monitorQueue.js';
+import { logger, sanitizeError } from '../utils/logger.js';
 
 /**
  * The worker owns a dedicated Redis connection (BullMQ blocking commands).
@@ -31,18 +32,13 @@ export function createMonitorWorker(): Worker<MonitorCheckJobData> {
     },
   );
 
-  worker.on('completed', (job, result: { status: string; responseTime: number }) => {
-    if (result.status === 'SKIPPED_PAUSED') {
-      console.log(`[worker] Monitor ${job.data.monitorId} is paused — check skipped`);
-      return;
-    }
-    console.log(
-      `[worker] Check for monitor ${job.data.monitorId}: ${result.status} (${result.responseTime} ms)`,
-    );
-  });
-
+  // Per-check results are already emitted as the structured `check_evaluated`
+  // event inside monitorCheckService — no plain-text twin here.
   worker.on('failed', (job, err) => {
-    console.error(`[worker] Job ${job?.id ?? '?'} failed: ${err.message}`);
+    logger.error('monitor_job_failed', {
+      jobId: job?.id ?? 'unknown',
+      error: sanitizeError(err),
+    });
   });
 
   return worker;

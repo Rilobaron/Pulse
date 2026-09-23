@@ -6,8 +6,3 @@ export const listIncidents = asyncHandler(async (req: Request, res: Response) =>
   const incidents = await incidentService.listIncidentsForUser(req.userId!);
   res.status(200).json(incidents);
 });
-
-export const listMonitorIncidents = asyncHandler(async (req: Request, res: Response) => {
-  const incidents = await incidentService.listIncidentsForMonitor(req.userId!, req.params.id);
-  res.status(200).json(incidents);
-});

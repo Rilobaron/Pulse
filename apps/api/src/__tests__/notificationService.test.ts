@@ -38,6 +38,14 @@ function monitor(overrides: Record<string, unknown> = {}) {
   } as never;
 }
 
+/**
+ * `Model.findById(...)` returns a Mongoose Query: thenable *and* chainable with
+ * `.select(...)`. Resolving the value directly would not model that contract.
+ */
+function selectableQuery(result: unknown) {
+  return { select: vi.fn().mockResolvedValue(result) } as never;
+}
+
 function channel(id: string) {
   return { _id: { toString: () => id }, name: 'ch', type: 'WEBHOOK', enabled: true } as never;
 }
@@ -58,7 +66,7 @@ describe('incident notification fan-out', () => {
   });
 
   it('creates one delivery + job per enabled channel', async () => {
-    findMonitorById.mockResolvedValue(monitor());
+    findMonitorById.mockReturnValue(selectableQuery(monitor()));
     findChannels.mockResolvedValue([channel('c1'), channel('c2')]);
     findOneAndUpdateDelivery.mockResolvedValue(delivery('PENDING'));
 
@@ -70,7 +78,7 @@ describe('incident notification fan-out', () => {
   });
 
   it('a monitor with no channels produces zero jobs', async () => {
-    findMonitorById.mockResolvedValue(monitor({ notificationChannelIds: [] }));
+    findMonitorById.mockReturnValue(selectableQuery(monitor({ notificationChannelIds: [] })));
 
     const enqueued = await enqueueIncidentNotifications(params);
 
@@ -80,7 +88,7 @@ describe('incident notification fan-out', () => {
   });
 
   it('disabled channels produce no deliveries', async () => {
-    findMonitorById.mockResolvedValue(monitor());
+    findMonitorById.mockReturnValue(selectableQuery(monitor()));
     findChannels.mockResolvedValue([
       { _id: { toString: () => 'c1' }, name: 'on', type: 'WEBHOOK', enabled: true },
       { _id: { toString: () => 'c2' }, name: 'off', type: 'DISCORD', enabled: false },
@@ -98,7 +106,7 @@ describe('incident notification fan-out', () => {
   });
 
   it('processing the same incident event twice creates no second job (SENT skipped)', async () => {
-    findMonitorById.mockResolvedValue(monitor());
+    findMonitorById.mockReturnValue(selectableQuery(monitor()));
     findChannels.mockResolvedValue([channel('c1')]);
     // Delivery already SENT from the first run.
     findOneAndUpdateDelivery.mockResolvedValue(delivery('SENT'));
@@ -110,7 +118,7 @@ describe('incident notification fan-out', () => {
   });
 
   it('a racing duplicate-key insert is skipped instead of duplicated', async () => {
-    findMonitorById.mockResolvedValue(monitor());
+    findMonitorById.mockReturnValue(selectableQuery(monitor()));
     findChannels.mockResolvedValue([channel('c1')]);
     const dupErr = Object.assign(new Error('E11000 duplicate key'), { code: 11000 });
     findOneAndUpdateDelivery.mockRejectedValue(dupErr);

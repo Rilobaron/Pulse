@@ -59,14 +59,14 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                 )
               }
             >
-              <Icon className="h-4.5 w-4.5 h-[18px] w-[18px]" />
+              <Icon className="h-[18px] w-[18px]" />
               {label}
             </NavLink>
           ))}
         </nav>
 
         <div className="border-t border-border px-6 py-4">
-          <p className="text-xs text-muted-dark">Pulse v0.1.0</p>
+          <p className="text-xs text-muted-dark">Pulse v1.0.0</p>
         </div>
       </aside>
     </>

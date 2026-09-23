@@ -12,7 +12,6 @@ async function main(): Promise<void> {
 
   const worker = createNotificationWorker();
   logger.info('worker_started', { worker: 'notification-worker', queue: 'notifications' });
-  console.log('[notification-worker] Notification worker started');
 
   const shutdown = async (signal: string) => {
     logger.info('worker_stopping', { worker: 'notification-worker', signal });

@@ -41,8 +41,10 @@ import { StatCard } from '@/components/StatCard';
 import { StatusBadge } from '@/components/StatusBadge';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Drawer } from '@/components/ui/Drawer';
-import { MonitorForm, type MonitorFormValues } from '@/components/MonitorForm';
-import { useToast } from '@/components/ui/Toast';
+import { MonitorForm } from '@/components/MonitorForm';
+import { type MonitorFormValues } from '@/lib/monitorForm';
+import { useToast } from '@/components/ui/toast-context';
+import { useNow } from '@/lib/useNow';
 
 type Range = '24h' | '7d' | '30d';
 const RANGE_MS: Record<Range, number> = {
@@ -59,6 +61,10 @@ export default function MonitorDetailPage() {
   const [editing, setEditing] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+
+  // Re-render every 30s so "Last Check: 4 minutes ago" advances without
+  // refetching — relative time is computed from a static ISO timestamp.
+  useNow(30_000);
 
   const monitorQuery = useQuery({
     queryKey: ['monitors', id],
@@ -174,6 +180,17 @@ export default function MonitorDetailPage() {
   const incidents = incidentsQuery.data ?? [];
   const paused = monitor.isPaused;
 
+  // Anti-flapping context — no new status is invented here, this only surfaces
+  // the existing counters while the status is still being decided:
+  //   UP/DOWN pending → "2 / 3 failed checks" (not DOWN until the threshold)
+  //   DOWN recovering → "1 / 2 successful checks required for recovery"
+  const antiFlapHint =
+    !paused && monitor.status !== 'DOWN' && monitor.consecutiveFailures > 0
+      ? `${monitor.consecutiveFailures} / ${monitor.failureThreshold} failed checks`
+      : !paused && monitor.status === 'DOWN' && monitor.consecutiveSuccesses > 0
+        ? `${monitor.consecutiveSuccesses} / ${monitor.recoveryThreshold} successful checks required for recovery`
+        : null;
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -199,6 +216,7 @@ export default function MonitorDetailPage() {
               <Badge variant="muted">{monitor.method}</Badge>
               <Badge variant="muted">every {Math.round(monitor.interval / 1000)}s</Badge>
               <Badge variant="muted">timeout {monitor.timeout / 1000}s</Badge>
+              {antiFlapHint && <span className="text-xs text-muted-dark">{antiFlapHint}</span>}
             </div>
           </div>
 
@@ -284,9 +302,16 @@ export default function MonitorDetailPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {chartData.length === 0 ? (
+          {checks.length === 0 ? (
+            <p className="py-12 text-center text-sm text-muted">No checks recorded yet.</p>
+          ) : chartData.length === 0 ? (
             <p className="py-12 text-center text-sm text-muted">
               No check data in this range yet.
+            </p>
+          ) : chartData.length === 1 ? (
+            // A single point would render a misleading area — wait for more data.
+            <p className="py-12 text-center text-sm text-muted">
+              More data is needed to build the response time chart.
             </p>
           ) : (
             <div className="h-64 w-full">
@@ -323,7 +348,13 @@ export default function MonitorDetailPage() {
                     stroke="#10b981"
                     strokeWidth={2}
                     fill="url(#responseFill)"
-                    dot={false}
+                    // With few points the line alone reads as a flat/empty chart —
+                    // show the actual samples instead.
+                    dot={
+                      chartData.length <= 8
+                        ? { r: 3, strokeWidth: 0, fill: '#10b981' }
+                        : false
+                    }
                     activeDot={{ r: 4 }}
                   />
                 </AreaChart>
@@ -339,9 +370,7 @@ export default function MonitorDetailPage() {
         </CardHeader>
         <CardContent className="px-0 pb-0">
           {incidents.length === 0 ? (
-            <p className="px-6 pb-8 pt-2 text-sm text-muted">
-              No incidents recorded. This monitor has been stable.
-            </p>
+            <p className="px-6 pb-8 pt-2 text-sm text-muted">No incidents recorded.</p>
           ) : (
             <Table>
               <THead>

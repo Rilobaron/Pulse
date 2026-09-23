@@ -208,7 +208,3 @@ export async function listIncidentsForUser(userId: string): Promise<IncidentDTO[
     toIncidentDTO(incident, nameById.get(incident.monitorId.toString())),
   );
 }
-
-export async function countActiveIncidents(userId: string): Promise<number> {
-  return Incident.countDocuments({ userId, status: 'OPEN' });
-}

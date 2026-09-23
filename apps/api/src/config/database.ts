@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { env } from './env.js';
+import { logger } from '../utils/logger.js';
 
 export async function connectDatabase(): Promise<void> {
   mongoose.set('strictQuery', true);
@@ -8,7 +9,7 @@ export async function connectDatabase(): Promise<void> {
     serverSelectionTimeoutMS: 10_000,
   });
 
-  console.log(`[db] Connected to MongoDB`);
+  logger.info('database_connected');
 }
 
 export async function disconnectDatabase(): Promise<void> {

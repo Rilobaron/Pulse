@@ -23,3 +23,9 @@ Thumbs.db
 # Misc
 coverage/
 *.tsbuildinfo
+
+# Stray local logs (never commit build/output logs)
+outlog.txt
+out.log
+dx.log
+rcx.log

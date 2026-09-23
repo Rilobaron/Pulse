@@ -71,7 +71,8 @@ export async function checkHealth(): Promise<{
     service: 'pulse-api',
     mongo,
     redis,
-    uptime: Math.floor((Date.now() - startedAt) / 1000),
+    // Math.max: a host clock step backwards must never report negative uptime.
+    uptime: Math.max(0, Math.floor((Date.now() - startedAt) / 1000)),
   };
 }
 

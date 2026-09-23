@@ -1,6 +1,6 @@
 {
   "name": "pulse",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Pulse - Website & API uptime monitoring platform",
   "workspaces": [
@@ -8,9 +8,10 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently -n api,worker,web -c blue,yellow,green \"npm run dev -w @pulse/api\" \"npm run worker -w @pulse/api\" \"npm run dev -w @pulse/web\"",
+    "dev": "concurrently -n api,worker,notify,web -c blue,yellow,magenta,green \"npm run dev -w @pulse/api\" \"npm run worker -w @pulse/api\" \"npm run notification-worker -w @pulse/api\" \"npm run dev -w @pulse/web\"",
     "dev:api": "npm run dev -w @pulse/api",
     "dev:worker": "npm run worker -w @pulse/api",
+    "dev:notify": "npm run notification-worker -w @pulse/api",
     "dev:web": "npm run dev -w @pulse/web",
     "build": "npm run build -w @pulse/api && npm run build -w @pulse/web",
     "typecheck": "npm run typecheck -w @pulse/shared && npm run typecheck -w @pulse/api && npm run typecheck -w @pulse/web",

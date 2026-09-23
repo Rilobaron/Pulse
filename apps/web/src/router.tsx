@@ -1,8 +1,7 @@
-import { createBrowserRouter, Navigate, Outlet } from 'react-router-dom';
-import { useAuth } from '@/lib/auth';
+import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { ProtectedRoute, PublicOnlyRoute } from '@/components/RouteGuards';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { AuthLayout } from '@/components/layout/AuthLayout';
-import { Spinner } from '@/components/ui/Spinner';
 import LoginPage from '@/pages/LoginPage';
 import RegisterPage from '@/pages/RegisterPage';
 import DashboardPage from '@/pages/DashboardPage';
@@ -12,28 +11,6 @@ import MonitorDetailPage from '@/pages/MonitorDetailPage';
 import StatusPageSettingsPage from '@/pages/StatusPageSettingsPage';
 import StatusPagePublic from '@/pages/StatusPagePublic';
 import NotificationsSettingsPage from '@/pages/NotificationsSettingsPage';
-
-function FullScreenSpinner() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <Spinner className="h-8 w-8" />
-    </div>
-  );
-}
-
-function ProtectedRoute() {
-  const { user, isLoading } = useAuth();
-  if (isLoading) return <FullScreenSpinner />;
-  if (!user) return <Navigate to="/login" replace />;
-  return <Outlet />;
-}
-
-function PublicOnlyRoute() {
-  const { user, isLoading } = useAuth();
-  if (isLoading) return <FullScreenSpinner />;
-  if (user) return <Navigate to="/dashboard" replace />;
-  return <Outlet />;
-}
 
 export const router = createBrowserRouter([
   // Public status pages — no authentication required

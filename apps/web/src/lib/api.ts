@@ -46,6 +46,9 @@ export function setToken(token: string | null): void {
 // proxy or the nginx proxy. Trailing slashes are stripped so we never emit "//api".
 const API_BASE_URL = (import.meta.env.VITE_API_URL ?? '').trim().replace(/\/+$/, '');
 
+/** Upper bound for a single API request — long enough for slow lists, short enough to fail fast. */
+const REQUEST_TIMEOUT_MS = 20_000;
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
 
@@ -59,11 +62,15 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     response = await fetch(`${API_BASE_URL}/api${path}`, {
       ...options,
       headers: { ...headers, ...(options.headers as Record<string, string> | undefined) },
+      // Never let a hung request spin forever; callers surface a clear message.
+      signal: options.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
-  } catch {
-    // fetch only rejects when no HTTP response was received (server down, DNS, or a
-    // CORS block, which the browser reports the same way). Surface that distinctly
-    // instead of letting callers fall back to a generic message.
+  } catch (err) {
+    // fetch only rejects when no HTTP response was received (server down, DNS,
+    // CORS — which the browser reports the same way — or the timeout above).
+    if (err instanceof DOMException && (err.name === 'TimeoutError' || err.name === 'AbortError')) {
+      throw new ApiError(0, 'The request timed out. Please try again.');
+    }
     throw new ApiError(0, 'Unable to reach the server. Please check your connection and try again.');
   }
 

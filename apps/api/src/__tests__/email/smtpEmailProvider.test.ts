@@ -1,8 +1,19 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, afterEach } from 'vitest';
+
+// SMTP configuration is read from `env` at call time; keep it mutable so the
+// "not configured" tests and the injected-transport test can both be honest.
+const smtp = vi.hoisted(() => ({
+  host: '',
+  port: 587,
+  user: '',
+  password: '',
+  from: '',
+  secure: false,
+}));
 
 vi.mock('../../config/env.js', () => ({
   env: {
-    smtp: { host: '', port: 587, user: '', password: '', from: '', secure: false },
+    smtp,
     notification: { maxAttempts: 5, backoffMs: 1000, webhookTimeoutMs: 5000 },
   },
 }));
@@ -11,6 +22,11 @@ import { createSmtpEmailProvider } from '../../providers/email/smtpEmailProvider
 import { renderIncidentEmail } from '../../providers/email/emailProvider.js';
 
 describe('email provider (mocked transport — no real emails)', () => {
+  afterEach(() => {
+    smtp.host = '';
+    smtp.from = '';
+  });
+
   it('reports itself as not configured when SMTP is missing', () => {
     const provider = createSmtpEmailProvider();
     expect(provider.isConfigured()).toBe(false);
@@ -24,6 +40,10 @@ describe('email provider (mocked transport — no real emails)', () => {
   });
 
   it('delivers through the injected transport (json stream, no network)', async () => {
+    // Configured SMTP — this case must exercise the transport, not the guard.
+    smtp.host = 'smtp.example.com';
+    smtp.from = 'Pulse <alerts@example.com>';
+
     const sent: Array<Record<string, unknown>> = [];
     const fakeTransport = {
       sendMail: vi.fn(async (mail: unknown) => {
@@ -83,7 +103,9 @@ describe('email templates', () => {
       timestamp: '2026-01-01T00:04:18.000Z',
     });
 
-    expect(email.subject).toContain('recovered');
+    // The recovery subject reads "Pulse Recovery — <name> is operational".
+    expect(email.subject).toContain('Recovery');
+    expect(email.subject).toContain('API Production');
     expect(email.text).toContain('4 minutes');
   });
 

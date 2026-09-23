@@ -11,14 +11,14 @@ import { formatRelativeTime } from '@/lib/utils';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { FieldError, Input } from '@/components/ui/Input';
+import { Input, Select } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { Switch } from '@/components/ui/Switch';
 import { Drawer } from '@/components/ui/Drawer';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { TableSkeleton } from '@/components/ui/Skeleton';
-import { useToast } from '@/components/ui/Toast';
+import { useToast } from '@/components/ui/toast-context';
 
 const TYPE_LABEL: Record<NotificationChannelType, string> = {
   DISCORD: 'Discord',
@@ -64,18 +64,19 @@ function ChannelForm({ channel, onSubmit, onCancel, submitting, serverError }: C
 
       <div>
         <Label htmlFor="ch-type">Type</Label>
-        <select
+        <Select
           id="ch-type"
           value={type}
           disabled={Boolean(channel)}
           onChange={(e) => setType(e.target.value as NotificationChannelType)}
-          className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm text-foreground focus:border-primary/50 focus:outline-none"
         >
           <option value="DISCORD">Discord</option>
           <option value="WEBHOOK">Webhook</option>
           <option value="EMAIL">Email</option>
-        </select>
- {channel && <p className="mt-1.5 text-xs text-muted-dark">Type cannot be changed after creation.</p>}
+        </Select>
+        {channel && (
+          <p className="mt-1.5 text-xs text-muted-dark">Type cannot be changed after creation.</p>
+        )}
       </div>
 
       <div>
@@ -92,7 +93,6 @@ function ChannelForm({ channel, onSubmit, onCancel, submitting, serverError }: C
           placeholder={targetPlaceholder}
           className={type === 'EMAIL' ? '' : 'font-mono text-xs'}
         />
-        <FieldError message={serverError && serverError.includes('Target') ? serverError : undefined} />
         {type === 'WEBHOOK' && (
           <p className="mt-1.5 text-xs text-muted-dark">
             Internal/private addresses are blocked. A signing secret is generated automatically — keep it
@@ -206,7 +206,7 @@ export default function NotificationsSettingsPage() {
   const deliveries = deliveriesQuery.data ?? [];
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Notification Channels</h1>
           <p className="mt-1 text-sm text-muted">
@@ -324,7 +324,11 @@ export default function NotificationsSettingsPage() {
                     variant={delivery.status === 'SENT' ? 'success' : delivery.status === 'FAILED' ? 'danger' : 'muted'}
                     dot
                   >
-                    {delivery.status}
+                    {delivery.status === 'PENDING'
+                      ? 'Pending'
+                      : delivery.status === 'SENT'
+                        ? 'Sent'
+                        : 'Failed'}
                   </Badge>
                 </li>
               ))}

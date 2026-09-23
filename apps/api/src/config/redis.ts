@@ -1,5 +1,6 @@
 import { Redis } from 'ioredis';
 import { env } from './env.js';
+import { logger, sanitizeError } from '../utils/logger.js';
 
 /**
  * BullMQ requires `maxRetriesPerRequest: null` on blocking commands.
@@ -11,7 +12,7 @@ export const redisConnection = new Redis(env.redisUrl, {
 });
 
 redisConnection.on('error', (err) => {
-  console.error('[redis] Connection error:', err.message);
+  logger.error('redis_connection_error', { message: sanitizeError(err) });
 });
 
 /** Creates a dedicated connection (one per queue producer / worker). */

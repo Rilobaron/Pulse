@@ -23,6 +23,19 @@ import { handleStatusTransition } from '../services/incidentService.js';
 
 const findOneAndUpdate = vi.mocked(Incident.findOneAndUpdate);
 
+/**
+ * The service reads `_id` and `startedAt` from the document returned by
+ * `findOneAndUpdate({ new: true })` to log/notify — the mock must model a real
+ * Mongoose document, not an empty object.
+ */
+function incidentDoc() {
+  return {
+    _id: { toString: () => '64b2f0000000000000000003' },
+    status: 'OPEN',
+    startedAt: new Date('2026-01-01T00:00:00.000Z'),
+  };
+}
+
 const base = {
   monitorId: '64b2f0000000000000000001',
   userId: '64b2f0000000000000000002',
@@ -37,7 +50,7 @@ describe('incident lifecycle', () => {
   });
 
   it('UP -> DOWN opens exactly one incident (upsert with $setOnInsert)', async () => {
-    findOneAndUpdate.mockResolvedValue({} as never);
+    findOneAndUpdate.mockResolvedValue(incidentDoc() as never);
 
     await handleStatusTransition({ ...base, previousStatus: 'UP', newStatus: 'DOWN' });
 
@@ -54,7 +67,7 @@ describe('incident lifecycle', () => {
   });
 
   it('UNKNOWN -> DOWN opens an incident (first real DOWN opens)', async () => {
-    findOneAndUpdate.mockResolvedValue({} as never);
+    findOneAndUpdate.mockResolvedValue(incidentDoc() as never);
     await handleStatusTransition({ ...base, previousStatus: 'UNKNOWN', newStatus: 'DOWN' });
     expect(findOneAndUpdate).toHaveBeenCalledTimes(1);
     const update = findOneAndUpdate.mock.calls[0][1] as { $setOnInsert: { status: string } };
@@ -62,7 +75,7 @@ describe('incident lifecycle', () => {
   });
 
   it('DOWN -> DOWN does NOT create another incident (only refreshes lastHttpStatus)', async () => {
-    findOneAndUpdate.mockResolvedValue({} as never);
+    findOneAndUpdate.mockResolvedValue(incidentDoc() as never);
     await handleStatusTransition({
       ...base,
       previousStatus: 'DOWN',
@@ -82,7 +95,7 @@ describe('incident lifecycle', () => {
 
   it('concurrent duplicate-key error is swallowed (no second incident)', async () => {
     const dupErr = Object.assign(new Error('E11000 duplicate key'), { code: 11000 });
-    findOneAndUpdate.mockRejectedValueOnce(dupErr).mockResolvedValueOnce({} as never);
+    findOneAndUpdate.mockRejectedValueOnce(dupErr).mockResolvedValueOnce(incidentDoc() as never);
 
     await expect(
       handleStatusTransition({ ...base, previousStatus: 'UP', newStatus: 'DOWN' }),
@@ -93,7 +106,7 @@ describe('incident lifecycle', () => {
   });
 
   it('DOWN -> UP resolves the open incident', async () => {
-    findOneAndUpdate.mockResolvedValue({} as never);
+    findOneAndUpdate.mockResolvedValue(incidentDoc() as never);
     await handleStatusTransition({ ...base, previousStatus: 'DOWN', newStatus: 'UP' });
 
     const [filter, update] = findOneAndUpdate.mock.calls[0] as [

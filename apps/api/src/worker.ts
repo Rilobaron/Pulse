@@ -12,7 +12,6 @@ async function main(): Promise<void> {
 
   const worker = createMonitorWorker();
   logger.info('worker_started', { worker: 'monitor-worker', queue: 'monitor-checks' });
-  console.log('[monitor-worker] Monitor check worker started');
 
   const shutdown = async (signal: string) => {
     logger.info('worker_stopping', { worker: 'monitor-worker', signal });

@@ -13,10 +13,15 @@ import { TableSkeleton } from '@/components/ui/Skeleton';
 import { StatusBadge } from '@/components/StatusBadge';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Drawer } from '@/components/ui/Drawer';
-import { MonitorForm, type MonitorFormValues } from '@/components/MonitorForm';
-import { useToast } from '@/components/ui/Toast';
+import { MonitorForm } from '@/components/MonitorForm';
+import { type MonitorFormValues } from '@/lib/monitorForm';
+import { useToast } from '@/components/ui/toast-context';
+import { useNow } from '@/lib/useNow';
 
 export default function MonitorsPage() {
+  // Keep relative timestamps ("4 minutes ago") advancing without extra fetches.
+  useNow(30_000);
+
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -72,7 +77,7 @@ export default function MonitorsPage() {
   const monitors = monitorsQuery.data ?? [];
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Monitors</h1>
           <p className="mt-1 text-sm text-muted">Manage the endpoints Pulse keeps an eye on</p>
@@ -80,7 +85,7 @@ export default function MonitorsPage() {
         <Link to="/monitors/new">
           <Button>
             <Plus className="h-4 w-4" />
-            New Monitor
+            Create monitor
           </Button>
         </Link>
       </div>
@@ -97,7 +102,7 @@ export default function MonitorsPage() {
               <Link to="/monitors/new">
                 <Button size="sm">
                   <Plus className="h-4 w-4" />
-                  New Monitor
+                  Create monitor
                 </Button>
               </Link>
             }

@@ -19,8 +19,12 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { StatCardSkeleton, TableSkeleton } from '@/components/ui/Skeleton';
 import { StatCard } from '@/components/StatCard';
 import { StatusBadge } from '@/components/StatusBadge';
+import { useNow } from '@/lib/useNow';
 
 export default function DashboardPage() {
+  // Keep relative timestamps ("4 minutes ago") advancing without extra fetches.
+  useNow(30_000);
+
   const statsQuery = useQuery({
     queryKey: ['stats', 'dashboard'],
     queryFn: api.stats.dashboard,
@@ -47,15 +51,15 @@ export default function DashboardPage() {
   const recentIncidents = incidents.slice(0, 5);
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Dashboard</h1>
           <p className="mt-1 text-sm text-muted">Overview of all your monitored services</p>
         </div>
-        <Link to="/monitors/new" className="hidden sm:block">
+        <Link to="/monitors/new">
           <Button>
             <Plus className="h-4 w-4" />
-            New Monitor
+            Create monitor
           </Button>
         </Link>
       </div>
@@ -93,12 +97,12 @@ export default function DashboardPage() {
               <EmptyState
                 icon={Activity}
                 title="No monitors yet"
-                description="Create your first monitor to start tracking uptime and response times."
+                description="Create your first monitor to start tracking uptime."
                 action={
                   <Link to="/monitors/new">
                     <Button size="sm">
                       <Plus className="h-4 w-4" />
-                      New Monitor
+                      Create monitor
                     </Button>
                   </Link>
                 }
@@ -150,7 +154,7 @@ export default function DashboardPage() {
               {incidentsQuery.isLoading ? (
                 <TableSkeleton rows={3} />
               ) : recentIncidents.length === 0 ? (
-                <p className="py-4 text-sm text-muted">No incidents recorded. All clear.</p>
+                <p className="py-4 text-sm text-muted">No incidents recorded.</p>
               ) : (
                 <ul className="space-y-4">
                   {recentIncidents.map((incident) => (
